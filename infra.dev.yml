@@ -20,7 +20,8 @@ services:
     # **MUDANÇA AQUI:** Expõe o Portainer diretamente em uma porta alta (ex: 9000).
     ports:
       - "9000:9000"
-    # **REMOVIDO:** Regras de Traefik (Labels) para Portainer.
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
 
   # --- TRAEFIK (Proxy Reverso - Mantido, mas Simplificado) ---
   traefik:
@@ -35,6 +36,7 @@ services:
       # **REMOVIDO:** Entrypoint 443 (HTTPS), pois não temos domínio/certificado.
       # Configura o dashboard (Opcional)
       - --api.dashboard=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
     ports:
       - "80:80"
       - "8080:8080" # Dashboard do Traefik (Monitoramento)
@@ -50,6 +52,8 @@ services:
       - "traefik.http.routers.traefik.rule=PathPrefix(`/dashboard`)"
       - "traefik.http.routers.traefik.entrypoints=web"
       - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.middlewares.traefik-strip.stripprefix.prefixes=/dashboard"
+      - "traefik.http.routers.traefik.middlewares=traefik-strip"
 
 volumes:
   portainer_data:

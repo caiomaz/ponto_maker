@@ -1,0 +1,82 @@
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret}
+  DJANGO_DEBUG: "True"
+  DJANGO_ALLOWED_HOSTS: "*"
+  DB_ENGINE: django.db.backends.sqlite3
+  DB_NAME: /app/db.sqlite3
+  DJANGO_STATIC_ROOT: /app/staticfiles
+  DJANGO_MEDIA_ROOT: /app/media
+  TZ: ${TZ:-America/Sao_Paulo}
+
+networks:
+  proxy:
+    # Esta rede é criada pelo infra.dev.yml
+    external: true
+
+services:
+  backend:
+    build:
+      context: .
+    container_name: ponto-backend-dev
+    init: true
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./:/app
+      - static_data_dev:/app/staticfiles
+      - media_data_dev:/app/media
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # Roteamento baseado em caminho (Path), não Hostname
+      - "traefik.http.routers.ponto-dev.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.ponto-dev.entrypoints=web"
+      - "traefik.http.services.ponto-dev.loadbalancer.server.port=8000"
+      # Middleware para remover o prefixo /api antes de encaminhar para o backend
+      - "traefik.http.middlewares.ponto-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.ponto-dev.middlewares=ponto-strip"
+
+volumes:
+  static_data_dev:
+  media_data_dev:
+      - media_data_dev:/app/media
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # Roteamento baseado em caminho (Path), não Hostname
+      - "traefik.http.routers.ponto-dev.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.ponto-dev.entrypoints=web"
+      - "traefik.http.services.ponto-dev.loadbalancer.server.port=8000"
+      # Middleware para remover o prefixo /api antes de encaminhar para o backend
+      - "traefik.http.middlewares.ponto-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.ponto-dev.middlewares=ponto-strip"
+
+volumes:
+  postgres_data_dev:
+  static_data_dev:
+  media_data_dev:

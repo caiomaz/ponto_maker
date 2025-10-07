@@ -16,6 +16,8 @@ services:
     restart: always
     networks:
       - proxy # Coloca na mesma rede que o Traefik
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
     labels:
       # Configura o Traefik para expor o Portainer
       - "traefik.enable=true"
@@ -23,6 +25,12 @@ services:
       - "traefik.http.routers.portainer.entrypoints=websecure"
       # Redirecionamento de HTTP para HTTPS (Opcional, mas recomendado)
       - "traefik.http.routers.portainer.tls=true" 
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "traefik.http.routers.portainer-http.rule=Host(`portainer.sua-dominio.com`)"
+      - "traefik.http.routers.portainer-http.entrypoints=web"
+      - "traefik.http.routers.portainer-http.middlewares=portainer-https@docker"
+      - "traefik.http.middlewares.portainer-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.portainer-https.redirectscheme.permanent=true"
 
   # --- TRAEFIK (Proxy Reverso) ---
   traefik:
@@ -35,8 +43,11 @@ services:
       # Configura pontos de entrada (portas)
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
       # Configura o dashboard (Opcional)
       - --api.dashboard=true
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
     ports:
       - "80:80"
       - "443:443"
@@ -45,9 +56,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Opcional: Para armazenamento de certificados SSL
       # - ./traefik_data/acme.json:/acme.json 
+      - traefik_letsencrypt:/acme.json
     restart: always
     networks:
       - proxy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
     labels:
       # Configura o Traefik para expor seu próprio dashboard
       - "traefik.enable=true"
@@ -58,3 +72,4 @@ services:
 
 volumes:
   portainer_data:
+  traefik_letsencrypt:
