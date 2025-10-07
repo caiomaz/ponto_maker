@@ -39,7 +39,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      # Roteamento baseado em caminho (Path), não Hostname
+      - "traefik.http.routers.ponto-dev.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.ponto-dev.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.ponto-dev.entrypoints=web"
       - "traefik.http.services.ponto-dev.loadbalancer.server.port=8000"
@@ -48,35 +48,5 @@ services:
       - "traefik.http.routers.ponto-dev.middlewares=ponto-strip"
 
 volumes:
-  static_data_dev:
-  media_data_dev:
-      - media_data_dev:/app/media
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - internal
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      # Roteamento baseado em caminho (Path), não Hostname
-      - "traefik.http.routers.ponto-dev.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.ponto-dev.entrypoints=web"
-      - "traefik.http.services.ponto-dev.loadbalancer.server.port=8000"
-      # Middleware para remover o prefixo /api antes de encaminhar para o backend
-      - "traefik.http.middlewares.ponto-strip.stripprefix.prefixes=/api"
-      - "traefik.http.routers.ponto-dev.middlewares=ponto-strip"
-
-volumes:
-  postgres_data_dev:
   static_data_dev:
   media_data_dev:
