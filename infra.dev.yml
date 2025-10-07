@@ -1,0 +1,55 @@
+version: '3.8'
+
+networks:
+  proxy:
+    # Usaremos uma rede interna para o Traefik
+    external: false 
+
+services:
+  # --- PORTAINER (Gerenciamento da Interface Web) ---
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: always
+    networks:
+      - proxy
+    # **MUDANÇA AQUI:** Expõe o Portainer diretamente em uma porta alta (ex: 9000).
+    ports:
+      - "9000:9000"
+    # **REMOVIDO:** Regras de Traefik (Labels) para Portainer.
+
+  # --- TRAEFIK (Proxy Reverso - Mantido, mas Simplificado) ---
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      # Ativa o provedor Docker para auto-descoberta
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      # Configura pontos de entrada (portas)
+      - --entrypoints.web.address=:80
+      # **REMOVIDO:** Entrypoint 443 (HTTPS), pois não temos domínio/certificado.
+      # Configura o dashboard (Opcional)
+      - --api.dashboard=true
+    ports:
+      - "80:80"
+      - "8080:8080" # Dashboard do Traefik (Monitoramento)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: always
+    networks:
+      - proxy
+    labels:
+      # Configura o Traefik para expor seu próprio dashboard
+      - "traefik.enable=true"
+      # **MUDANÇA AQUI:** Roteamento baseado em caminho (Path), não Hostname!
+      - "traefik.http.routers.traefik.rule=PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+volumes:
+  portainer_data:
