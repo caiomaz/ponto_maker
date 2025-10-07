@@ -1,0 +1,4 @@
+nome_completo,matricula,email,biometric_id,status,departamento_nome,cargo_nome,turno_nome
+João Silva,12345,joao.silva@empresa.com,1001,Ativo,TI,Desenvolvedor,Comercial
+Maria Santos,12346,maria.santos@empresa.com,1002,Ativo,RH,Analista,Comercial
+Pedro Oliveira,12347,pedro.oliveira@empresa.com,1003,Ativo,Financeiro,Contador,Comercial
