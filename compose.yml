@@ -1,0 +1,73 @@
+version: "3.9"
+
+networks:
+  proxy:
+    external: true
+  internal:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ponto-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ponto}
+      POSTGRES_USER: ${DB_USER:-ponto}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ponto123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: .
+    container_name: ponto-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-ponto.seu-dominio.com,localhost}
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-ponto}
+      DB_USER: ${DB_USER:-ponto}
+      DB_PASSWORD: ${DB_PASSWORD:-ponto123}
+      DB_HOST: db
+      DB_PORT: 5432
+      DJANGO_STATIC_ROOT: /app/staticfiles
+      DJANGO_MEDIA_ROOT: /app/media
+    volumes:
+      - ./:/app
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    expose:
+      - "8000"
+    networks:
+      - internal
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ponto.rule=Host(`ponto.seu-dominio.com`)
+      - traefik.http.routers.ponto.entrypoints=websecure
+      - traefik.http.routers.ponto.tls=true
+      - traefik.http.services.ponto.loadbalancer.server.port=8000
+
+volumes:
+  postgres_data:
+  static_data:
+  media_data:

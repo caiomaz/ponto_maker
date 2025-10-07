@@ -1,0 +1,60 @@
+version: '3.8'
+
+networks:
+  proxy:
+    external: true # Usaremos essa rede para todos os serviços
+
+services:
+  # --- PORTAINER (Gerenciamento da Interface Web) ---
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: always
+    networks:
+      - proxy # Coloca na mesma rede que o Traefik
+    labels:
+      # Configura o Traefik para expor o Portainer
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.sua-dominio.com`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      # Redirecionamento de HTTP para HTTPS (Opcional, mas recomendado)
+      - "traefik.http.routers.portainer.tls=true" 
+
+  # --- TRAEFIK (Proxy Reverso) ---
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      # Ativa o provedor Docker para auto-descoberta
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      # Configura pontos de entrada (portas)
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Configura o dashboard (Opcional)
+      - --api.dashboard=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Porta do dashboard do Traefik (Não exponha na internet)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Opcional: Para armazenamento de certificados SSL
+      # - ./traefik_data/acme.json:/acme.json 
+    restart: always
+    networks:
+      - proxy
+    labels:
+      # Configura o Traefik para expor seu próprio dashboard
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`monitor.sua-dominio.com`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.tls=true" 
+
+volumes:
+  portainer_data:
